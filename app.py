@@ -76,8 +76,8 @@ Include:
 - General summary of the book, its themes, and what makes it unique
 - Thesis of the book and how it differs from other books in the same category or genre
 - Main takeaways and actionable insights
-- Chapter-by-chapter key ideas including quotes from each chapter and/or section
-- Important quotes -- as many as possible (in-line and in a dedicated section)
+- Chapter-by-chapter key ideas including direct quotes from from each chapter and/or section (quotes from the book itself) 
+- Important quotes directly from the book -- as many as possible (in-line and in a dedicated section)
 - Distill a set of principles from the book that can be used in daily activities -- should be robust, 5-10 principles depending on the book 
 - Include the book notes provided at the end of the this title "User Notes" 
 
