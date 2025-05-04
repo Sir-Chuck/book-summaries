@@ -23,17 +23,17 @@ book_notes = st.text_area("Notes, excerpts, or reflections about the book")
 summary_style = st.selectbox("Summary Style", ["Narrative", "Bullet", "Professional", "Reflective"])
 submit = st.button("Generate Summary")
 
-if submit and book_title and book_notes:
+if submit and book_title:
     # === CALL OPENAI ===
     st.write("📤 Calling OpenAI API...")
     prompt = f"""
 Provide a comprehensive summary and overview of the book titled "{book_title}" using the following notes: {book_notes}.
 Include:
-- General summary
-- Thesis of the book
-- Main takeaways
-- Chapter-by-chapter key ideas
-- Important quotes (in-line and in a dedicated section)
+- General summary of the book and it's purpose
+- Thesis of the book and what makes it unique in its perspective
+- Main takeaways and actionable insights from the book
+- Chapter-by-chapter summary and key ideas
+- Important quotes -- as many as possible (in-line and in a dedicated section)
 Use this tone/style: {summary_style}.
 Avoid markdown (**bold**, _italic_) — return clean plain text with clear structure.
     """
