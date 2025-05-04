@@ -1,5 +1,6 @@
 import streamlit as st
 import openai
+from openai import OpenAI
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -7,41 +8,98 @@ from docx import Document
 import tempfile
 import os
 
-# === SETUP ===
-openai.api_key = st.secrets["OPENAI_API_KEY"]
-SCOPES = ['https://www.googleapis.com/auth/drive.file']
-SERVICE_ACCOUNT_INFO = st.secrets["gcp_service_account"]
-credentials = service_account.Credentials.from_service_account_info(SERVICE_ACCOUNT_INFO, scopes=SCOPES)
-drive_service = build('drive', 'v3', credentials=credentials)
+# === STYLING ===
+st.set_page_config(page_title="Book Summarizer", layout="centered")
 
-# === STREAMLIT UI ===
-st.title("📘 Book Summarizer")
-st.write("Generate a detailed summary of a book and save it to Google Drive.")
+# Inject custom CSS
+st.markdown("""
+    <style>
+    body, div, input, label, textarea, select {
+        font-family: Verdana !important;
+        color: #2a2a2a !important;
+    }
+    h1 {
+        font-family: 'Courier New', monospace !important;
+        font-weight: normal !important;
+        color: #2a2a2a !important;
+        font-size: 40px !important;
+        margin-bottom: 0.2em;
+    }
+    .by-chuck {
+        font-size: 20px;
+        font-weight: bold;
+        letter-spacing: 2px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
+# === ACCESS CONTROL ===
+st.title("Book Summarizer")
+st.markdown("""
+<div class='by-chuck'>
+    <span style='color:#f27802;'>C</span>
+    <span style='color:#2e0854;'>H</span>
+    <span style='color:#7786c8;'>U</span>
+    <span style='color:#708090;'>C</span>
+    <span style='color:#b02711;'>K</span>
+</div>
+""", unsafe_allow_html=True)
+
+passphrase = st.text_input("🔐 Enter passphrase to continue", type="password")
+if passphrase.strip().lower() != "chucks books":
+    st.stop()
+
+# === FORM UI ===
 book_title = st.text_input("Book Title")
-book_notes = st.text_area("Notes, excerpts, or reflections about the book")
+book_notes = st.text_area("Notes, excerpts, or reflections (optional)")
 summary_style = st.selectbox("Summary Style", ["Narrative", "Bullet", "Professional", "Reflective"])
 submit = st.button("Generate Summary")
 
 if submit and book_title:
-    # === CALL OPENAI ===
-    st.write("📤 Calling OpenAI API...")
-    prompt = f"""
-Provide a comprehensive summary and overview of the book titled "{book_title}" using the following notes: {book_notes}.
+    # === SETUP ===
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    SCOPES = ['https://www.googleapis.com/auth/drive.file']
+    SERVICE_ACCOUNT_INFO = st.secrets["gcp_service_account"]
+    credentials = service_account.Credentials.from_service_account_info(SERVICE_ACCOUNT_INFO, scopes=SCOPES)
+    drive_service = build('drive', 'v3', credentials=credentials)
+
+    # === BUILD PROMPT ===
+    if book_notes.strip():
+        prompt = f"""
+You are a literary critic and professional book summarizer.
+
+Please provide a comprehensive summary and overview of the book titled "{book_title}" using the following notes: {book_notes}.
+
 Include:
-- General summary of the book and it's purpose
-- Thesis of the book and what makes it unique in its perspective
-- Main takeaways and actionable insights from the book
-- Chapter-by-chapter summary and key ideas
-- Important quotes -- as many as possible (in-line and in a dedicated section)
+- General summary
+- Thesis of the book
+- Main takeaways
+- Chapter-by-chapter key ideas
+- Important quotes (in-line and in a dedicated section)
+
 Use this tone/style: {summary_style}.
 Avoid markdown (**bold**, _italic_) — return clean plain text with clear structure.
-    """
+        """
+    else:
+        prompt = f"""
+You are a literary critic and professional book summarizer.
 
+Please provide a comprehensive summary and overview of the book titled "{book_title}".
+
+Include:
+- General summary
+- Thesis of the book
+- Main takeaways
+- Chapter-by-chapter key ideas
+- Important quotes (in-line and in a dedicated section)
+
+Use this tone/style: {summary_style}.
+Avoid markdown (**bold**, _italic_) — return clean plain text with clear structure.
+        """
+
+    # === CALL OPENAI ===
+    st.write("📤 Calling OpenAI...")
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -51,16 +109,14 @@ Avoid markdown (**bold**, _italic_) — return clean plain text with clear struc
             temperature=0.7
         )
         summary_text = response.choices[0].message.content.strip()
-
         st.success("✅ Summary generated!")
         st.text(f"Length: {len(summary_text)} characters")
-
     except Exception as e:
         st.error("❌ OpenAI API call failed")
         st.exception(e)
         st.stop()
 
-    # === CREATE .DOCX FILE ===
+    # === CREATE .DOCX ===
     try:
         st.write("📝 Creating Word document...")
         doc = Document()
@@ -98,7 +154,6 @@ Avoid markdown (**bold**, _italic_) — return clean plain text with clear struc
         }
 
         media = MediaFileUpload(tmp_path, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-
         file = drive_service.files().create(
             body=file_metadata,
             media_body=media,
@@ -106,7 +161,7 @@ Avoid markdown (**bold**, _italic_) — return clean plain text with clear struc
         ).execute()
 
         st.success("✅ Uploaded to Google Drive!")
-        st.markdown(f"[📄 View Summary](https://drive.google.com/file/d/{file['id']}/view)")
+        st.markdown(f"[📄 View in Drive](https://drive.google.com/file/d/{file['id']}/view)")
 
     except Exception as e:
         st.error("❌ Google Drive upload failed")
