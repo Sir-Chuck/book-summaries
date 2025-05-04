@@ -2,14 +2,13 @@ import streamlit as st
 import openai
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 from docx import Document
 import tempfile
 import os
 
 # === SETUP ===
 openai.api_key = st.secrets["OPENAI_API_KEY"]
-
-# Google Drive API setup (with service account)
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 SERVICE_ACCOUNT_INFO = st.secrets["gcp_service_account"]
 credentials = service_account.Credentials.from_service_account_info(SERVICE_ACCOUNT_INFO, scopes=SCOPES)
@@ -17,28 +16,29 @@ drive_service = build('drive', 'v3', credentials=credentials)
 
 # === STREAMLIT UI ===
 st.title("📘 Book Summarizer")
-st.write("Generate detailed summaries and upload to Google Drive")
+st.write("Generate a detailed summary of a book and save it to Google Drive.")
 
 book_title = st.text_input("Book Title")
-book_notes = st.text_area("Notes or Description")
+book_notes = st.text_area("Notes, excerpts, or reflections about the book")
 summary_style = st.selectbox("Summary Style", ["Narrative", "Bullet", "Professional", "Reflective"])
 submit = st.button("Generate Summary")
 
 if submit and book_title and book_notes:
-    with st.spinner("Generating summary..."):
-        # === PROMPT ===
-        prompt = f"""
-        Provide a comprehensive summary and overview of the book titled "{book_title}" using the following notes: {book_notes}.
-        Include:
-        - General summary
-        - Thesis of the book
-        - Main takeaways
-        - Chapter-by-chapter key ideas
-        - Important quotes (in-line and in a dedicated section)
-        Please use the summary style: {summary_style}. Do NOT use markdown (**bold**, _italic_) formatting.
-        """
+    # === CALL OPENAI ===
+    st.write("📤 Calling OpenAI API...")
+    prompt = f"""
+Provide a comprehensive summary and overview of the book titled "{book_title}" using the following notes: {book_notes}.
+Include:
+- General summary
+- Thesis of the book
+- Main takeaways
+- Chapter-by-chapter key ideas
+- Important quotes (in-line and in a dedicated section)
+Use this tone/style: {summary_style}.
+Avoid markdown (**bold**, _italic_) — return clean plain text with clear structure.
+    """
 
-        # === CALL OPENAI ===
+    try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -48,10 +48,20 @@ if submit and book_title and book_notes:
             temperature=0.7
         )
         summary_text = response.choices[0].message.content.strip()
+        st.success("✅ Summary generated!")
+        st.text(f"Length: {len(summary_text)} characters")
 
-        # === CREATE DOCX ===
+    except Exception as e:
+        st.error("❌ OpenAI API call failed")
+        st.exception(e)
+        st.stop()
+
+    # === CREATE .DOCX FILE ===
+    try:
+        st.write("📝 Creating Word document...")
         doc = Document()
         doc.add_heading(f"📘 {book_title}", level=1)
+
         for section in summary_text.split("\n\n"):
             lines = section.strip().split("\n")
             if len(lines) == 1:
@@ -64,24 +74,39 @@ if submit and book_title and book_notes:
                     else:
                         doc.add_paragraph(line.strip())
 
-        # === SAVE TEMP DOC AND UPLOAD ===
         with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
             doc.save(tmp.name)
             tmp_path = tmp.name
 
+    except Exception as e:
+        st.error("❌ Failed to generate Word document")
+        st.exception(e)
+        st.stop()
+
+    # === UPLOAD TO GOOGLE DRIVE ===
+    try:
+        st.write("📤 Uploading to Google Drive...")
+
         file_metadata = {
-            'name': f'Summary - {book_title}.docx',
-            'mimeType': 'application/vnd.google-apps.document',
-            'parents': [st.secrets["GDRIVE_FOLDER_ID"]]
+            'name': f"Summary - {book_title}.docx",
+            'parents': [st.secrets["GDRIVE_FOLDER_ID"]],
+            'mimeType': 'application/vnd.google-apps.document'
         }
-        media = {'name': os.path.basename(tmp_path), 'mimeType': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}
-        media_body = build('drive', 'v3', credentials=credentials).files().create(
+
+        media = MediaFileUpload(tmp_path, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+
+        file = drive_service.files().create(
             body=file_metadata,
-            media_body=tmp_path,
+            media_body=media,
             fields='id'
         ).execute()
 
-        st.success("✅ Summary generated and uploaded to Google Drive!")
-        st.markdown(f"📂 [Open in Drive](https://drive.google.com/file/d/{media_body['id']}/view)")
+        st.success("✅ Uploaded to Google Drive!")
+        st.markdown(f"[📄 View Summary](https://drive.google.com/file/d/{file['id']}/view)")
 
-        os.remove(tmp_path)
+    except Exception as e:
+        st.error("❌ Google Drive upload failed")
+        st.exception(e)
+        st.stop()
+
+    os.remove(tmp_path)
