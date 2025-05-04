@@ -39,7 +39,10 @@ Avoid markdown (**bold**, _italic_) — return clean plain text with clear struc
     """
 
     try:
-        response = openai.ChatCompletion.create(
+        from openai import OpenAI
+        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You are a literary critic and professional book summarizer."},
@@ -48,6 +51,7 @@ Avoid markdown (**bold**, _italic_) — return clean plain text with clear struc
             temperature=0.7
         )
         summary_text = response.choices[0].message.content.strip()
+
         st.success("✅ Summary generated!")
         st.text(f"Length: {len(summary_text)} characters")
 
