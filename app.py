@@ -29,11 +29,12 @@ st.markdown("""
         font-size: 20px;
         font-weight: bold;
         letter-spacing: 2px;
+        margin-bottom: 1em;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# === ACCESS CONTROL ===
+# === HEADER ===
 st.title("Book Summarizer")
 st.markdown("""
 <div class='by-chuck'>
@@ -45,6 +46,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# === PASS PHRASE ===
 passphrase = st.text_input("🔐 Enter passphrase to continue", type="password")
 if passphrase.strip().lower() != "chucks books":
     st.stop()
@@ -68,14 +70,16 @@ if submit and book_title:
         prompt = f"""
 You are a literary critic and professional book summarizer.
 
-Please provide a comprehensive summary and overview of the book titled "{book_title}" using the following notes: {book_notes}.
+Please provide a comprehensive summary, overview, and review of the book titled "{book_title}" using the following notes: {book_notes}.
 
 Include:
-- General summary
-- Thesis of the book
-- Main takeaways
-- Chapter-by-chapter key ideas
-- Important quotes (in-line and in a dedicated section)
+- General summary of the book, its themes, and what makes it unique
+- Thesis of the book and how it differs from other books in the same category or genre
+- Main takeaways and actionable insights
+- Chapter-by-chapter key ideas including quotes from each chapter and/or section
+- Important quotes -- as many as possible (in-line and in a dedicated section)
+- Distill a set of principles from the book that can be used in daily activities -- should be robust, 5-10 principles depending on the book 
+- Include the book notes provided at the end of the this title "User Notes" 
 
 Use this tone/style: {summary_style}.
 Avoid markdown (**bold**, _italic_) — return clean plain text with clear structure.
